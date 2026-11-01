@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PRITHVI-ORBIT | Tactical Rescue Command Console</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <style>
+    body { background-color: #070D18; color: #EDF4F8; font-family: ui-sans-serif, system-ui, sans-serif; }
+    .bg-space { background-color: #070D18; }
+    .bg-panel { background-color: #0E1B2F; }
+    .bg-card { background-color: #14253F; }
+    .border-subtle { border: 1px solid #1E3557; }
+    .text-cyan-brand { color: #00F2FE; }
+    #console-map { height: 100%; width: 100%; border-radius: 14px; }
+  </style>
+</head>
+<body class="h-screen w-screen flex overflow-hidden select-none">
+
+  <!-- LEFT NAVIGATION MENU (TABS) -->
+  <aside class="w-64 bg-panel border-r border-subtle flex flex-col justify-between shrink-0 z-40">
+    <div>
+      <div class="p-5 border-b border-subtle flex items-center space-x-3">
+        <span class="text-2xl">🛡️</span>
+        <div>
+          <h1 class="text-sm font-black tracking-wider text-white">RESCUE CONSOLE</h1>
+          <p class="text-[9px] text-cyan-brand font-mono">Disaster Action HQ</p>
+        </div>
+      </div>
+
+      <!-- Tab Buttons -->
+      <nav class="p-3 space-y-1.5 text-xs font-semibold">
+        <button onclick="showTab('tab-sos')" id="btn-tab-sos" class="w-full text-left px-3.5 py-3 rounded-xl bg-card text-cyan-brand border border-cyan-500/30 flex items-center gap-2.5">
+          <span>🚨</span> <span>Live SOS Queue</span>
+        </button>
+        <button onclick="showTab('tab-routing')" id="btn-tab-routing" class="w-full text-left px-3.5 py-3 rounded-xl text-slate-400 hover:bg-card hover:text-white flex items-center gap-2.5">
+          <span>🛣️</span> <span>Rescue Route & Maps</span>
+        </button>
+        <button onclick="showTab('tab-closures')" id="btn-tab-closures" class="w-full text-left px-3.5 py-3 rounded-xl text-slate-400 hover:bg-card hover:text-white flex items-center gap-2.5">
+          <span>🚧</span> <span>Road Closures (Cuts)</span>
+        </button>
+        <button onclick="showTab('tab-shelters')" id="btn-tab-shelters" class="w-full text-left px-3.5 py-3 rounded-xl text-slate-400 hover:bg-card hover:text-white flex items-center gap-2.5">
+          <span>🏕️</span> <span>Shelter Availability</span>
+        </button>
+        <button onclick="showTab('tab-fires')" id="btn-tab-fires" class="w-full text-left px-3.5 py-3 rounded-xl text-slate-400 hover:bg-card hover:text-white flex items-center gap-2.5">
+          <span>🔥</span> <span>Farm Fire & Wind Vector</span>
+        </button>
+      </nav>
+    </div>
+
+    <div class="p-4 border-t border-subtle text-[10px] text-slate-500">
+      Authority: SDMA &bull; Port 8001
+    </div>
+  </aside>
+
+  <!-- MAIN OPERATIONAL VIEW -->
+  <main class="flex-1 flex overflow-hidden">
+    
+    <!-- Left Column (Tab Details) -->
+    <div class="w-[450px] bg-space border-r border-subtle p-5 overflow-y-auto space-y-4 shrink-0">
+      
+      <!-- TAB 1: LIVE SOS QUEUE -->
+      <section id="tab-sos" class="space-y-3">
+        <div class="flex justify-between items-center border-b border-subtle pb-2">
+          <h2 class="text-xs font-bold text-white uppercase tracking-wider">Active Distress Incidents</h2>
+          <button onclick="loadSOSQueue()" class="text-[10px] text-cyan-brand hover:underline font-mono">Refresh</button>
+        </div>
+        <div id="sos-list-container" class="space-y-2 text-xs">
+          <!-- Populated by JS -->
+        </div>
+      </section>
+
+      <!-- TAB 2: RESCUE ROUTING & GOOGLE MAPS REDIRECT -->
+      <section id="tab-routing" class="hidden space-y-3">
+        <div class="border-b border-subtle pb-2">
+          <h2 class="text-xs font-bold text-white uppercase tracking-wider">Rescue Unit Dispatch & Navigation</h2>
+          <p class="text-[10px] text-slate-400">Avoids flooded roads via NetworkX shortest path.</p>
+        </div>
+        <div id="routing-summary-box" class="p-4 bg-panel border border-subtle rounded-2xl space-y-3 text-xs">
+          <div class="text-slate-400">Kripya pehle <b>Live SOS Queue</b> se kisi incident par click karein.</div>
+        </div>
+      </section>
+
+      <!-- TAB 3: ROAD CLOSURES CONTROL -->
+      <section id="tab-closures" class="hidden space-y-3">
+        <div class="border-b border-subtle pb-2">
+          <h2 class="text-xs font-bold text-white uppercase tracking-wider">NetworkX Flood Cuts Simulation</h2>
+        </div>
+        <div class="space-y-2 text-xs">
+          <div class="p-3 bg-panel rounded-xl border border-subtle flex justify-between items-center">
+            <div>
+              <b class="text-white block">Kharar &harr; Ropar Crossing</b>
+              <span class="text-[10px] text-slate-400">NH-205 Lowland Bridge</span>
+            </div>
+            <button onclick="toggleClosure('KHARAR_JUNCTION', 'ROPAR_CROSSING', this)" id="btn-cut-1" class="px-3 py-1.5 rounded-lg font-bold bg-red-950 text-red-300 border border-red-700">FLOODED (CUT)</button>
+          </div>
+          <div class="p-3 bg-panel rounded-xl border border-subtle flex justify-between items-center">
+            <div>
+              <b class="text-white block">Mohali &harr; Kharar Arterial</b>
+              <span class="text-[10px] text-slate-400">Airport Road Extension</span>
+            </div>
+            <button onclick="toggleClosure('MOHALI_CENTER', 'KHARAR_JUNCTION', this)" id="btn-cut-2" class="px-3 py-1.5 rounded-lg font-bold bg-emerald-950 text-emerald-300 border border-emerald-700">CLEAR (OPEN)</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- TAB 4: SHELTERS -->
+      <section id="tab-shelters" class="hidden space-y-3">
+        <div class="border-b border-subtle pb-2">
+          <h2 class="text-xs font-bold text-white uppercase tracking-wider">Relief Shelter Status</h2>
+        </div>
+        <div id="shelters-list-box" class="space-y-2 text-xs"></div>
+      </section>
+
+      <!-- TAB 5: FARM FIRES -->
+      <section id="tab-fires" class="hidden space-y-3">
+        <div class="border-b border-subtle pb-2">
+          <h2 class="text-xs font-bold text-white uppercase tracking-wider">Stubble Hotspots & Wind</h2>
+        </div>
+        <div id="fire-summary-box" class="p-4 bg-panel border border-subtle rounded-2xl text-xs space-y-2">
+          <div class="flex justify-between"><span>Wind Direction:</span> <b class="text-cyan-brand font-mono" id="txt-wind">Loading...</b></div>
+          <div class="flex justify-between"><span>Thermal Points:</span> <b class="text-amber-400 font-mono" id="txt-hotspots">Loading...</b></div>
+        </div>
+      </section>
+
+    </div>
+
+    <!-- Right Tactical Map -->
+    <div class="flex-1 p-4 relative bg-space">
+      <div id="console-map"></div>
+    </div>
+  </main>
+
+  <script>
+    let consoleMap = L.map('console-map', { zoomControl: false }).setView([30.73, 76.65], 9);
+    L.control.zoom({ position: 'bottomright' }).addTo(consoleMap);
+    L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { maxZoom: 18 }).addTo(consoleMap);
+    let routeGroup = L.layerGroup().addTo(consoleMap);
+
+    window.addEventListener('DOMContentLoaded', () => {
+      loadSOSQueue();
+      loadShelters();
+      loadTelemetry();
+    });
+
+    function showTab(tabId) {
+      ['tab-sos', 'tab-routing', 'tab-closures', 'tab-shelters', 'tab-fires'].forEach(id => {
+        document.getElementById(id).classList.toggle('hidden', id !== tabId);
+      });
+      ['btn-tab-sos', 'btn-tab-routing', 'btn-tab-closures', 'btn-tab-shelters', 'btn-tab-fires'].forEach(btn => {
+        const isCurrent = btn === 'btn-' + tabId;
+        document.getElementById(btn).className = isCurrent 
+          ? "w-full text-left px-3.5 py-3 rounded-xl bg-card text-cyan-brand border border-cyan-500/30 flex items-center gap-2.5 font-bold shadow"
+          : "w-full text-left px-3.5 py-3 rounded-xl text-slate-400 hover:bg-card hover:text-white flex items-center gap-2.5 font-semibold";
+      });
+      setTimeout(() => consoleMap.invalidateSize(), 100);
+    }
+
+    function loadSOSQueue() {
+      fetch('/api/sos/active').then(r => r.json()).then(data => {
+        const c = document.getElementById('sos-list-container');
+        if (!data.requests.length) {
+          c.innerHTML = '<div class="p-3 bg-panel rounded-xl text-slate-400">No active SOS requests queued.</div>';
+          return;
+        }
+        c.innerHTML = data.requests.map(req => `
+          <div onclick="selectIncidentForRouting(${req.id})" class="p-3 bg-panel border border-subtle hover:border-cyan-500/50 rounded-xl cursor-pointer space-y-1">
+            <div class="flex justify-between items-center font-bold">
+              <span class="text-red-400">🚨 SOS Incident #${req.id}</span>
+              <span class="text-[9px] px-1.5 py-0.5 rounded bg-red-950 text-red-300 font-mono">${req.party_size} Persons</span>
+            </div>
+            <div class="text-[11px] text-slate-300">Coords: ${req.lat.toFixed(4)}, ${req.lon.toFixed(4)}</div>
+            <div class="text-[10px] text-cyan-brand font-mono">Assigned: ${req.assigned_unit_id || 'Evaluating'}</div>
+          </div>
+        `).join('');
+      });
+    }
+
+    function selectIncidentForRouting(sosId) {
+      showTab('tab-routing');
+      fetch(`/api/rescue/navigate/${sosId}`).then(r => r.json()).then(d => {
+        const box = document.getElementById('routing-summary-box');
+        box.innerHTML = `
+          <div class="space-y-2">
+            <div class="flex justify-between items-center">
+              <b class="text-white">Incident #${d.sos_id} Dispatch Plan</b>
+              <span class="text-[9px] px-2 py-0.5 rounded bg-cyan-950 text-cyan-300 font-mono">NETWORKX PATH</span>
+            </div>
+            <div class="text-[11px] text-slate-300 space-y-0.5">
+              <div>Assigned Unit: <b>${d.assigned_unit}</b></div>
+              <div>Est. Response Time: <b>~${d.candidate_route.estimated_minutes || '35'} mins</b></div>
+              <div class="text-emerald-400 text-[10px]">Avoided Flood Cuts: ${d.candidate_route.blocked_edges_avoided.join(', ') || 'Direct Avenue Clear'}</div>
+            </div>
+
+            <!-- Turn-by-Turn Redirect for Rescuers -->
+            <a href="${d.google_maps_direct_link}" target="_blank" class="w-full py-3 bg-emerald-600 hover:bg-emerald-500 font-bold rounded-xl text-white text-center flex items-center justify-center gap-2 shadow">
+              <span>↗️</span> Google Maps Turn-by-Turn Rescue Link
+            </a>
+          </div>
+        `;
+
+        // Render on Map
+        routeGroup.clearLayers();
+        L.circleMarker(d.victim_coords, { radius: 9, fillColor: "#EF4444", color: "#FFF", weight: 2, fillOpacity: 1 }).addTo(routeGroup).bindPopup("<b>🚨 Victim SOS Location</b>");
+        L.circleMarker(d.unit_coords, { radius: 9, fillColor: "#10B981", color: "#FFF", weight: 2, fillOpacity: 1 }).addTo(routeGroup).bindPopup("<b>🛡️ Rescue Asset Base</b>");
+
+        if (d.candidate_route.coordinates && d.candidate_route.coordinates.length) {
+          const poly = L.polyline(d.candidate_route.coordinates, { color: '#00F2FE', weight: 4.5, dashArray: '6, 6' }).addTo(routeGroup);
+          consoleMap.fitBounds(poly.getBounds(), { padding: [50, 50] });
+        }
+      });
+    }
+
+    function toggleClosure(fromN, toN, btn) {
+      const isBlocked = btn.innerText.includes("CUT");
+      fetch('/api/admin/closures/toggle', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ from_node: fromN, to_node: toN, blocked: !isBlocked, reason: "Simulated Culvert Breach" })
+      }).then(() => {
+        btn.className = !isBlocked ? "px-3 py-1.5 rounded-lg font-bold bg-red-950 text-red-300 border border-red-700" : "px-3 py-1.5 rounded-lg font-bold bg-emerald-950 text-emerald-300 border border-emerald-700";
+        btn.innerText = !isBlocked ? "FLOODED (CUT)" : "CLEAR (OPEN)";
+      });
+    }
+
+    function loadShelters() {
+      fetch('/api/shelters').then(r => r.json()).then(d => {
+        document.getElementById('shelters-list-box').innerHTML = d.shelters.map(s => `
+          <div class="p-3 bg-panel rounded-xl border border-subtle">
+            <b class="text-white block">${s.label}</b>
+            <span class="text-[10px] text-slate-400">Capacity: ${s.capacity} &bull; Status: <b class="text-emerald-400">${s.status}</b></span>
+          </div>
+        `).join('');
+      });
+    }
+
+    function loadTelemetry() {
+      fetch('/api/weather').then(r => r.json()).then(w => {
+        document.getElementById('txt-wind').innerText = `${w.wind_speed} km/h (${w.wind_direction}°)`;
+      });
+      fetch('/api/fires').then(r => r.json()).then(f => {
+        document.getElementById('txt-hotspots').innerText = `${f.active_hotspots} Hotspots`;
+      });
+    }
+  </script>
+</body>
+</html>
